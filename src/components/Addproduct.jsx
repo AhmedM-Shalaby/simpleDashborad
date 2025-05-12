@@ -1,154 +1,141 @@
-import React, { useEffect } from "react";
-import { useState } from "react";
+import { useEffect } from "react";
 import MyCard from "./MyCard";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getProductById } from "./../models/useGetProduct";
 import { PostData } from "../models/usePostData";
 import { editData } from "../models/useEdit";
 import { baseUrl } from "../Api/httpServer";
+import { useFormik } from "formik";
+import { inputs, schemaAddProduct } from "../models/schemaAddProduct";
 
 export default function Addproduct() {
   const navigate = useNavigate();
   const { id } = useParams();
   const url = `${baseUrl}/products`;
-  const [dataForm, setDataForm] = useState({
-    title: "",
-    description: "",
-    price: 0,
-    stock: 0,
-    brand: "",
-    category: "",
-  });
-  const operationImg = (e) => {
-    const fileReader = new FileReader();
-    fileReader.readAsDataURL(e.target.files[0]);
-    fileReader.onload = (e) => {};
-  };
-  const operationHandler = (e) => {
-    setDataForm({
-      ...dataForm,
-      [e.target.name]: e.target.value,
-    });
-  };
-  const submitHandeler = (e) => {
-    e.preventDefault();
-    setDataForm({
-      title: "",
-      description: "",
-      price: 0,
-      stock: 0,
-      brand: "",
-      category: "",
-    });
-    if (id === undefined) {
-      console.log("add");
-      PostData(url, dataForm);
-    } else {
-      console.log("edit");
-      editData(`${url}/${id}`, dataForm);
-    }
-    navigate("/");
-  };
+
   useEffect(() => {
     if (id !== undefined) {
       const fetchData = async () => {
         const response = await getProductById(`${url}/${id}`);
-        setDataForm(response.data);
+        MyForm.setValues({
+          title: response.data.title || "",
+          description: response.data.description || "",
+          price: response.data.price || 1,
+          stock: response.data.stock || 1,
+          brand: response.data.brand || "",
+          category: response.data.category || "",
+          thumbnail: response.data.thumbnail || "",
+        });
       };
       fetchData();
     }
   }, [id]);
+  const initialValues = {
+    title: "",
+    description: "",
+    price: 1,
+    stock: 1,
+    brand: "",
+    category: "",
+    thumbnail: "",
+  };
+  const onSubmit = (values) => {
+    console.log(values);
+
+    if (id === undefined) {
+      console.log("add");
+      PostData(url, values);
+    } else {
+      console.log("edit");
+      editData(`${url}/${id}`, values);
+    }
+    navigate("/");
+  };
+  const MyForm = useFormik({
+    initialValues,
+    validationSchema: schemaAddProduct,
+    onSubmit,
+  });
+  const operationImg = (e) => {
+    const file = e.target.files[0];
+
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+
+      reader.onload = function (event) {
+        const img = new Image();
+        img.src = event.target.result;
+
+        img.onload = function () {
+          const canvas = document.createElement("canvas");
+          const maxSize = 800; // أقصى طول أو عرض
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxSize) {
+              height *= maxSize / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width *= maxSize / height;
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const resizedBase64 = canvas.toDataURL(file.type, 0.8); // 0.8 = جودة 80%
+          console.log(resizedBase64);
+          MyForm.setFieldValue("thumbnail", resizedBase64);
+          console.log("تم حفظ الصورة المصغرة ✅");
+        };
+      };
+
+      reader.readAsDataURL(file);
+    } else {
+      alert("من فضلك اختر صورة صحيحة فقط ❌");
+      e.target.value = ""; // امسح الاختيار
+      MyForm.setFieldValue("thumbnail", ""); // امسح thumbnail
+    }
+  };
 
   return (
     <div className="container mt-4">
       <h1>Add Product</h1>
       <div>
-        <form onSubmit={submitHandeler}>
+        <form onSubmit={MyForm.handleSubmit}>
           <div className="row">
-            <div className="col-lg-6">
-              <label htmlFor="productTitle">
-                Product Title
+            {inputs.map((field) => (
+              <div key={field.name} className="mb-3">
+                <label htmlFor={field.name} className="form-label">
+                  {field.label}
+                </label>
                 <input
-                  type="text"
-                  onChange={operationHandler}
-                  name="title"
-                  id="productTitle"
-                  className="form-control"
-                  placeholder="Title"
-                  value={dataForm.title}
+                  type={field.type}
+                  name={field.name}
+                  id={field.name}
+                  placeholder={field.placeholder}
+                  className={`form-control ${
+                    MyForm.errors[field.name] && MyForm.touched[field.name]
+                      ? "is-invalid"
+                      : ""
+                  }`}
+                  value={MyForm.values[field.name]}
+                  onChange={MyForm.handleChange}
+                  onBlur={MyForm.handleBlur}
                 />
-              </label>
-            </div>
-            <div className="col-lg-6">
-              <label htmlFor="productDescription">
-                Product Description
-                <input
-                  type="text"
-                  onChange={operationHandler}
-                  name="description"
-                  id="productDescription"
-                  className="form-control"
-                  placeholder=" Description"
-                  value={dataForm.description}
-                />
-              </label>
-            </div>
-            <div className="col-lg-6">
-              <label htmlFor="productPrice">
-                Product Price
-                <input
-                  type="number"
-                  onChange={operationHandler}
-                  name="price"
-                  id="productP"
-                  className="form-control"
-                  placeholder=" Price"
-                  value={dataForm.price}
-                />
-              </label>
-            </div>
-            <div className="col-lg-6">
-              <label htmlFor="productStock">
-                Product Stock
-                <input
-                  type="number"
-                  onChange={operationHandler}
-                  name="stock"
-                  id="productStock"
-                  className="form-control"
-                  placeholder=" Stock"
-                  value={dataForm.stock}
-                />
-              </label>
-            </div>
-            <div className="col-lg-6">
-              <label htmlFor="productBrand">
-                Product Brand
-                <input
-                  type="text"
-                  onChange={operationHandler}
-                  name="brand"
-                  id="productStock"
-                  className="form-control"
-                  placeholder=" Brand"
-                  value={dataForm.brand}
-                />
-              </label>
-            </div>
-            <div className="col-lg-6">
-              <label htmlFor="productCategory">
-                Product Category
-                <input
-                  type="text"
-                  onChange={operationHandler}
-                  name="category"
-                  id="productCategory"
-                  className="form-control"
-                  placeholder=" Category"
-                  value={dataForm.category}
-                />
-              </label>
-            </div>
+                {MyForm.errors[field.name] && MyForm.touched[field.name] && (
+                  <div className="invalid-feedback">
+                    {MyForm.errors[field.name]}
+                  </div>
+                )}
+              </div>
+            ))}
             <div className="col-lg-6">
               <p className="mt-3 fs-5"> Upload Image</p>
               <label htmlFor="productImage" className="labelImge">
@@ -166,7 +153,7 @@ export default function Addproduct() {
               </Link>
             </div>
             <div className="col-lg-6 mt-5">
-              <MyCard data={dataForm} id={id} />
+              <MyCard data={MyForm.values} id={id} />
             </div>
           </div>
         </form>
